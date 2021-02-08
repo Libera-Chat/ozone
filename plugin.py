@@ -1461,6 +1461,8 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
            canKline = not self.registryValue('useWhoWas')
            if i.defcon or 'gateway/' in prefix:
                canKline = True
+           elif '/' in prefix:
+               canKline = False
         else:
             self.log.info('INVALID PREFIX %s : %s : %s' % (prefix,mask,reason))
         self.log.info('CANKLINE %s %s %s' % (prefix,mask,canKline))
@@ -2743,7 +2745,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                     uid = random.randint(0,1000000)
                     privateReason = '%s - ns id flood on %s' % (uid,target)
                     if i.defcon:
-                        privateReason = '!dsnbl ' + privateReason
+                        privateReason = '!dnsbl ' + privateReason
                     self.kline(irc,u,mask,self.registryValue('klineDuration'), privateReason)
                     self.logChannel(irc,"BAD: %s (%s)" % (u,privateReason))
 
