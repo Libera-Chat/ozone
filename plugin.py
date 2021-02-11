@@ -1778,7 +1778,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
     def do322 (self,irc,msg):
         i = self.getIrc(irc)
         if msg.args[1] in i.invites:
-            if int(msg.args[2]) > self.registryValue('minimumUsersInChannel'):
+            if int(msg.args[2]) >= self.registryValue('minimumUsersInChannel'):
                 self.setRegistryValue('lastActionTaken',time.time(),channel=msg.args[1])
                 irc.queueMsg(ircmsgs.join(msg.args[1]))
                 try:
