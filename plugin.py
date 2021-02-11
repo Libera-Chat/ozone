@@ -3606,7 +3606,8 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                     flag = ircdb.makeChannelCapability(channel, 'cycle')
                     if ircdb.checkCapability(msg.prefix, flag):
                         bad = self.isBadOnChannel(irc,channel,'cycle',mask)
-                        self.isAbuseOnChannel(irc,channel,'cycle',mask)
+                        if bad:
+                            self.isAbuseOnChannel(irc,channel,'cycle',mask)
                     if bad:
                         isBanned = True
                         uid = random.randint(0,1000000)
@@ -3624,7 +3625,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                             #self.kline(irc,msg.prefix,mask,self.registryValue('klineDuration'),'%s in %s' % (bad,channel))
                             self.logChannel(irc,"IGNORED: [%s] %s (Part's message %s) : %s" % (channel,msg.prefix,bad,reason))
                     if not isBanned:
-                        life = self.registryValue('abuseDuration',channel=channel)
+                        life = self.registryValue('cycleLife',channel=channel)
                         if self.hasAbuseOnChannel(irc,channel,'cycle') and time.time() - chan.nicks[msg.nick][0] < life:
                             isBanned = True
                             uid = random.randint(0,1000000)
