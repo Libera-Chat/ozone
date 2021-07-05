@@ -1062,11 +1062,11 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
             ranges.append(range)
         return ranges
 
-    def resolve (self,irc,prefix,channel='',dnsbl=False,comment=False):
+    def resolve (self,irc,prefix,channel='',dnsbl=False,comment=False,dline=False):
         (nick,ident,host) = ircutils.splitHostmask(prefix)
         if ident.startswith('~'):
             ident = '*'
-        if prefix in self.cache:
+        if prefix in self.cache and not dnsbl and not dline:
             return self.cache[prefix]
         try:
             resolver = dns.resolver.Resolver()
@@ -1090,7 +1090,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                 for ip in ips:
                     if not str(ip) in L:
                         L.append(str(ip))
-            #self.log.debug('%s resolved as %s' % (prefix,L))
+            self.log.info('%s resolved as %s' % (prefix,L))
             if len(L) == 1:
                 h = L[0]
                 #self.log.debug('%s is resolved as %s@%s' % (prefix,ident,h))
@@ -1103,13 +1103,20 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                             if prefix in i.resolving:
                                 del i.resolving[prefix]
                             return
+                if dline:
+                    if utils.net.isIPV4(h) or utils.net.bruteIsIPV6(h):
+                        if self.registryValue('enable'):
+                            self.log.info('DLINE %s %s' % (h, self.registryValue('saslDuration')))
+                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s on * :%s' % (self.registryValue('saslDuration'),h,self.registryValue('saslMessage'))))
+                            return
                 self.cache[prefix] = '%s@%s' % (ident,h)
             else:
                 self.cache[prefix] = '%s@%s' % (ident,host)
         except:
+            self.log.info('%s not resolved' % prefix)
             self.cache[prefix] = '%s@%s' % (ident,host)
         i = self.getIrc(irc)
-        if channel and channel in irc.state.channels:
+        if len(channel) and channel in irc.state.channels:
             chan = self.getChan(irc,channel)
             if nick in irc.state.channels[channel].users:
                 if nick in chan.nicks:
@@ -1477,9 +1484,9 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
             reason = reason + ' !dnsbl Unknown spambot or drone'
         if ircutils.isUserHostmask(prefix):
            canKline = not self.registryValue('useWhoWas')
-           if 'gateway/' in prefix:
+           if 'gateway/' in mask:
                canKline = True
-           elif '/' in prefix:
+           elif '/' in mask:
                canKline = False
         else:
             self.log.info('INVALID PREFIX %s : %s : %s' % (prefix,mask,reason))
@@ -1975,6 +1982,9 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
         ip = None
         if 'solanum.chat/ip' in msg.server_tags:
             ip = msg.server_tags['solanum.chat/ip']
+        if ip is None:
+            if 'solanum.chat/realhost' in msg.server_tags:
+                ip = msg.server_tags['solanum.chat/realhost']
         mask = None
         if ip:
             (ni,ident,hos) = ircutils.splitHostmask(msg.prefix)
@@ -3022,18 +3032,31 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
         host = text.split(' (via SASL):')[1].split('>')[0]
         q = self.getIrcQueueFor(irc,'sasl',account,life)
         q.enqueue(host)
+#        self.log.info('sasl %s - %s  / %s' % (host,account,life))
         hosts = {}
         if len(q) > limit:
             for ip in q:
                 hosts[ip] = ip
+                self.log.info('SASL FAILURE / account -> %s %s' % (ip, account))
             q.reset()
         q = self.getIrcQueueFor(irc,'sasl',host,life)
         q.enqueue(account)
         if len(q) > limit:
             q.reset()
             hosts[host] = host
+            self.log.info('SASL FAILURE / host -> %s %s' % (host, account))
         if self.registryValue('enable'):
             if len(hosts) > 0:
+                for h in hosts:
+                    self.logChannel(irc,'SASL: %s (%s) (%s/%ss)' % (h,'SASL failures',limit,life))
+                    if utils.net.isIPV4(h) or utils.net.bruteIsIPV6(h):
+                        if self.registryValue('enable'):
+                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s on * :%s' % (self.registryValue('saslDuration'),h,self.registryValue('saslMessage'))))
+                    else:
+                        t = world.SupyThread(target=self.resolve,name=format('resolveDline %s', h),args=(irc,'*!*@%s' % h,False,False,False,True))
+                        t.setDaemon(True)
+                        t.start()
+                return
                 for h in hosts:
                     if len(i.dlines):
                         i.dlines.append(h)
@@ -3512,6 +3535,10 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
             account = msg.server_tags['account']
         if 'solanum.chat/ip' in msg.server_tags:
             ip = msg.server_tags['solanum.chat/ip']
+        if ip is None:
+            if 'solanum.chat/realhost' in msg.server_tags:
+                ip = msg.server_tags['solanum.chat/realhost']
+
         if len(msg.args) > 1:
             gecos = msg.args[2]
             if not account or account == '*' or account == '':
