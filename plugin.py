@@ -2961,6 +2961,9 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                     for range in ranges:
                         range = range
                         q = self.getIrcQueueFor(irc,'klineRange',range,self.registryValue('ipv4AbuseLife'))
+                        if ip in set(q):
+                            continue
+
                         q.enqueue(ip)
                         if len(q) > permit:
                             hs = []
