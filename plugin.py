@@ -495,7 +495,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                 type = 18
             elif comment == "Abused VPN Service":
                 type = 19
-            data = "<?xml version=\"1.0\"?><request key='"+droneblKey+"'><add ip='"+ip+"' type='"+str(type)+"' comment='irc spam' /></request>"
+            data = "<?xml version=\"1.0\"?><request key='"+droneblKey+"'><add ip='"+ip+"' type='"+str(type)+"' comment='abuse on irc' /></request>"
             r = requests.post(droneblHost,data=data,headers=headers)
             if r.status_code != 200:
                 self.logChannel(irc,'DNSBL: %s (add returned %s %s)' % (ip,r.status_code,r.reason))
