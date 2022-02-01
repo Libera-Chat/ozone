@@ -41,6 +41,7 @@ import sqlite3
 import http.client
 import threading
 import dns.resolver
+import dns.reversename
 import json
 import ipaddress
 import random
@@ -57,8 +58,8 @@ import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 import supybot.schedule as schedule
 import supybot.registry as registry
-from ftfy.badness import sequence_weirdness
-from ftfy.badness import text_cost
+from ftfy.badness import badness
+#from ftfy.badness import text_cost
 try:
     from supybot.i18n import PluginInternationalization
     _ = PluginInternationalization('Sigyn')
@@ -1090,29 +1091,31 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                 for ip in ips:
                     if not str(ip) in L:
                         L.append(str(ip))
-            self.log.info('%s resolved as %s' % (prefix,L))
-            if len(L) == 1:
-                h = L[0]
-                #self.log.debug('%s is resolved as %s@%s' % (prefix,ident,h))
-                if dnsbl:
-                    if utils.net.isIPV4(h) or utils.net.bruteIsIPV6(h):
-                        if len(self.registryValue('droneblKey')) and len(self.registryValue('droneblHost')) and self.registryValue('enable'):
-                            t = world.SupyThread(target=self.fillDnsbl,name=format('fillDnsbl %s', h),args=(irc,h,self.registryValue('droneblHost'),self.registryValue('droneblKey'),comment))
-                            t.setDaemon(True)
-                            t.start()
-                            if prefix in i.resolving:
-                                del i.resolving[prefix]
-                            return
-                if dline:
-                    if utils.net.isIPV4(h) or utils.net.bruteIsIPV6(h):
-                        if self.registryValue('enable'):
+#            self.log.info('%s resolved as %s' % (prefix,L))
+            if len(L):
+                for h in L:
+                    addr = dns.reversename.from_address(h)
+                    rep = resolver.query(addr, "PTR")[0]
+                    f = str(rep).rstrip(".")
+                    self.log.info ('%s is verified for %s (%s)' % (h, host, f == host))
+                    if f == host:
+                        self.cache[prefix] = '%s@%s' % (ident,h)
+                        if dnsbl:
+                            if len(self.registryValue('droneblKey')) and len(self.registryValue('droneblHost')) and self.registryValue('enable'):
+                                t = world.SupyThread(target=self.fillDnsbl,name=format('fillDnsbl %s', h),args=(irc,h,self.registryValue('droneblHost'),self.registryValue('droneblKey'),comment))
+                                t.setDaemon(True)
+                                t.start()
+                                if prefix in i.resolving:
+                                    del i.resolving[prefix]
+                        if dline and self.registryValue('enable'):
                             self.log.info('DLINE %s %s' % (h, self.registryValue('saslDuration')))
-                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s on * :%s' % (self.registryValue('saslDuration'),h,self.registryValue('saslMessage'))))
-                            return
-                self.cache[prefix] = '%s@%s' % (ident,h)
+                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s ON * :%s' % (self.registryValue('saslDuration'),h,self.registryValue('saslMessage'))))
+                if not prefix in self.cache:
+                    self.cache[prefix] = '%s@%s' % (ident,host)
             else:
                 self.cache[prefix] = '%s@%s' % (ident,host)
-        except:
+        except Exception as inst:
+            self.log.info('%s' % inst)
             self.log.info('%s not resolved' % prefix)
             self.cache[prefix] = '%s@%s' % (ident,host)
         i = self.getIrc(irc)
@@ -1280,7 +1283,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
             i.opered = True
             irc.queueMsg(ircmsgs.IrcMsg('MODE %s +p' % irc.nick))
             irc.queueMsg(ircmsgs.IrcMsg('MODE %s +s +Fbnfl' % irc.nick))
-            irc.queueMsg(ircmsgs.IrcMsg('CAP REQ :solanum.chat/realhost'))
+            #irc.queueMsg(ircmsgs.IrcMsg('CAP REQ :solanum.chat/realhost'))
             try:
                 conf.supybot.protocols.irc.throttleTime.setValue(0.0)
             except:
@@ -3054,9 +3057,9 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                     self.logChannel(irc,'SASL: %s (%s) (%s/%ss)' % (h,'SASL failures',limit,life))
                     if utils.net.isIPV4(h) or utils.net.bruteIsIPV6(h):
                         if self.registryValue('enable'):
-                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s on * :%s' % (self.registryValue('saslDuration'),h,self.registryValue('saslMessage'))))
+                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s ON * :%s' % (self.registryValue('saslDuration'),h,self.registryValue('saslMessage'))))
                     else:
-                        t = world.SupyThread(target=self.resolve,name=format('resolveDline %s', h),args=(irc,'*!*@%s' % h,False,False,False,True))
+                        t = world.SupyThread(target=self.resolve,name=format('resolveDline %s', h),args=(irc,'*!*@%s' % h,'',False,False,True))
                         t.setDaemon(True)
                         t.start()
                 return
@@ -3224,7 +3227,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
     def isChannelUnicode (self,irc,msg,channel,mask,text):
         limit = self.registryValue('badunicodeLimit',channel=channel)
         if limit > 0:
-            score = sequence_weirdness(u'%s' % text)
+            score = badness(u'%s' % text)
             count = self.registryValue('badunicodeScore',channel=channel)
             if count < score:
                 return self.isBadOnChannel(irc,channel,'badunicode',mask)
