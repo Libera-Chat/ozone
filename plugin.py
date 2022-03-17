@@ -161,7 +161,7 @@ addConverter('getPatternAndMatcher', getPatternAndMatcher)
 
 class Ircd (object):
 
-    __slots__ = ('irc', 'channels','whowas','klines','queues','opered','defcon','pending','logs','limits','netsplit','ping','servers','resolving','stats','patterns','throttled','lastDefcon','god','mx','tokline','toklineresults','dlines', 'invites', 'nicks', 'domains', 'cleandomains', 'ilines', 'klinednicks', 'lastKlineOper')
+    __slots__ = ('irc', 'channels','whowas','klines','queues','opered','defcon','pending','logs','limits','netsplit','ping','servers','resolving','stats','patterns','throttled','lastDefcon','god','mx','tokline','toklineresults','dlines', 'invites', 'nicks', 'domains', 'cleandomains', 'ilines', 'klinednicks', 'lastKlineOper', 'oldDlines')
 
     def __init__(self,irc):
         self.irc = irc
@@ -205,6 +205,7 @@ class Ircd (object):
         self.cleandomains = {}
         self.klinednicks = utils.structures.TimeoutQueue(86400*2)
         self.lastKlineOper = ''
+        self.oldDlines = utils.structures.TimeoutQueue(86400*7)
 
     def __repr__(self):
         return '%s(patterns=%r, queues=%r, channels=%r, pending=%r, logs=%r, limits=%r, whowas=%r, klines=%r)' % (self.__class__.__name__,
@@ -1109,7 +1110,15 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                                     del i.resolving[prefix]
                         if dline and self.registryValue('enable'):
                             self.log.info('DLINE %s %s' % (h, self.registryValue('saslDuration')))
-                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s ON * :%s' % (self.registryValue('saslDuration'),h,self.registryValue('saslMessage'))))
+                            found = False
+                            duration = self.registryValue('saslDuration')
+                            for m in self.oldDlines:
+                                if m == h:
+                                    found = True
+                            if found:
+                                duration = duration * 7
+                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s ON * :%s' % (duration,h,self.registryValue('saslMessage'))))
+                            self.oldDlines.enqueue(h)
                 if not prefix in self.cache:
                     self.cache[prefix] = '%s@%s' % (ident,host)
             else:
@@ -1283,7 +1292,6 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
             i.opered = True
             irc.queueMsg(ircmsgs.IrcMsg('MODE %s +p' % irc.nick))
             irc.queueMsg(ircmsgs.IrcMsg('MODE %s +s +Fbnfl' % irc.nick))
-            #irc.queueMsg(ircmsgs.IrcMsg('CAP REQ :solanum.chat/realhost'))
             try:
                 conf.supybot.protocols.irc.throttleTime.setValue(0.0)
             except:
@@ -1369,6 +1377,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
         if not irc.network in self._ircs:
             self._ircs[irc.network] = Ircd(irc)
             self._ircs[irc.network].restore(self.getDb(irc.network))
+            #irc.requestCapabilities(["solanum.chat/realhost"])
             if len(self.registryValue('operatorNick')) and len(self.registryValue('operatorPassword')):
                 irc.queueMsg(ircmsgs.IrcMsg('OPER %s %s' % (self.registryValue('operatorNick'),self.registryValue('operatorPassword'))))
         return self._ircs[irc.network]
@@ -3057,7 +3066,15 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                     self.logChannel(irc,'SASL: %s (%s) (%s/%ss)' % (h,'SASL failures',limit,life))
                     if utils.net.isIPV4(h) or utils.net.bruteIsIPV6(h):
                         if self.registryValue('enable'):
-                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s ON * :%s' % (self.registryValue('saslDuration'),h,self.registryValue('saslMessage'))))
+                            found = False
+                            duration = self.registryValue('saslDuration')
+                            for m in i.oldDlines:
+                                if m == h:
+                                    found = True
+                            if found:
+                                duration = duration * 7
+                            irc.queueMsg(ircmsgs.IrcMsg('DLINE %s %s ON * :%s' % (duration,h,self.registryValue('saslMessage'))))
+                            i.oldDlines.enqueue(h)
                     else:
                         t = world.SupyThread(target=self.resolve,name=format('resolveDline %s', h),args=(irc,'*!*@%s' % h,'',False,False,True))
                         t.setDaemon(True)
