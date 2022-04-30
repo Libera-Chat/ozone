@@ -2571,9 +2571,6 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
     def doTopic(self, irc, msg):
         self.handleMsg(irc,msg,False)
 
-    def do903 (self,irc,msg):
-        irc.queueMsg(ircmsgs.IrcMsg('CAP REQ :extended-join account-notify'))
-
     def handleFloodSnote (self,irc,text):
         user = text.split('Possible Flooder ')[1]
         a = user[::-1]
