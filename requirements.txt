@@ -1,0 +1,4 @@
+requests==2.27.1
+dnspython==2.2.1
+ftfy==6.1.1
+limnoria==2022.4.27 
