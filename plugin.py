@@ -2965,7 +2965,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
                          break
                 ip = text.split('K-Line for [*@')[1].split(']')[0]
                 permit = self.registryValue('ipv4AbusePermit')
-                if not 'evilmquin' in oper and permit > -1:
+                if not 'evilmquin' in oper and permit > -1 and not '!norange' in reason:
                     ranges = self._ip_ranges(ip)
                     for range in ranges:
                         range = range
