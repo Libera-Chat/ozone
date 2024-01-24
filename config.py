@@ -53,7 +53,7 @@ conf.registerGlobalValue(Sigyn, 'enable',
      registry.Boolean(False, """set to True to enable kill and klines, otherwise bot will only report to logChannel"""))
 
 conf.registerGlobalValue(Sigyn, 'mainChannel',
-     registry.String("#freenode","""main channel, where bot stay opped and op staffer on +z"""))
+     registry.String("#libera","""main channel, where bot stay opped and op staffer on +z"""))
 
 conf.registerGlobalValue(Sigyn, 'snoopChannel',
      registry.String("", """channel where services stuff are announced"""))
