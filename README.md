@@ -23,10 +23,6 @@ _Note: If the bot doesn't have the plugin, a 'no such plugin' error will be retu
 
 We enforce the ['Contributor Covenant' (version 1.4)](https://www.contributor-covenant.org/version/1/4/code-of-conduct.html). In essence, this covenant encourages all participants to be respectful and maintain a professional and constructive attitude towards everyone. If someone is violating the Code of Conduct, please PM 'niko' on IRC, or send an email to niko@libera.chat.
 
-## Project Structure
-
-The project is organized as follows:
-
 ## Contribution Guidelines
 
 Refer to the guidelines provided in `CONTRIBUTING.md` file for making contributions to this project. 
