@@ -1291,7 +1291,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
         if not i.opered:
             i.opered = True
             irc.queueMsg(ircmsgs.IrcMsg('MODE %s +p' % irc.nick))
-            irc.queueMsg(ircmsgs.IrcMsg('MODE %s +s +Fbnfl' % irc.nick))
+            irc.queueMsg(ircmsgs.IrcMsg('MODE %s +s +Fbcnfl' % irc.nick))
             try:
                 conf.supybot.protocols.irc.throttleTime.setValue(0.0)
             except:
