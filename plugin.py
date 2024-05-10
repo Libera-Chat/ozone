@@ -58,8 +58,9 @@ import supybot.ircutils as ircutils
 import supybot.callbacks as callbacks
 import supybot.schedule as schedule
 import supybot.registry as registry
-from ftfy.badness import badness
-#from ftfy.badness import text_cost
+
+from . import badness
+
 try:
     from supybot.i18n import PluginInternationalization
     _ = PluginInternationalization('Sigyn')
@@ -3241,7 +3242,7 @@ class Sigyn(callbacks.Plugin,plugins.ChannelDBHandler):
     def isChannelUnicode (self,irc,msg,channel,mask,text):
         limit = self.registryValue('badunicodeLimit',channel=channel)
         if limit > 0:
-            score = badness(u'%s' % text)
+            score = badness.badness(u'%s' % text)
             count = self.registryValue('badunicodeScore',channel=channel)
             if count < score:
                 return self.isBadOnChannel(irc,channel,'badunicode',mask)
